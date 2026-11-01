@@ -1,0 +1,117 @@
+@page "/students"
+@inject ContingentApi Api
+
+<PageTitle>Студенты</PageTitle>
+
+<h1>Студенты</h1>
+<p class="subtitle">Поиск и фильтрация карточек.</p>
+
+<div class="toolbar">
+    <input placeholder="Фамилия" @bind="lastName" @bind:event="oninput" @onkeyup="OnKeyUp" />
+    <select @bind="groupFilter">
+        <option value="">Все группы</option>
+        @foreach (var group in groups)
+        {
+            <option value="@group.Id">@group.Number</option>
+        }
+    </select>
+    <select @bind="statusFilter">
+        <option value="">Все статусы</option>
+        @foreach (var status in Enum.GetValues<StudentStatus>())
+        {
+            <option value="@status">@Labels.Of(status)</option>
+        }
+    </select>
+    <button @onclick="LoadAsync">Найти</button>
+    <span class="spacer"></span>
+    <a class="button primary" href="students/new">Новая карточка</a>
+</div>
+
+@if (error != null)
+{
+    <div class="alert alert-error">@error</div>
+}
+
+@if (students == null)
+{
+    <p class="muted">Загрузка…</p>
+}
+else if (students.Count == 0)
+{
+    <div class="card muted">Никого не найдено.</div>
+}
+else
+{
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ФИО</th>
+                    <th>№ зачётной книжки</th>
+                    <th>Группа</th>
+                    <th>Статус</th>
+                    <th>Основа обучения</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var student in students)
+                {
+                    <tr>
+                        <td><a href="students/@student.Id">@student.FullName</a></td>
+                        <td>@student.RecordBookNumber</td>
+                        <td>@(student.StudyGroup?.Number ?? "—")</td>
+                        <td><span class="@Labels.Css(student.Status)">@Labels.Of(student.Status)</span></td>
+                        <td>@Labels.Of(student.FundingBasis)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <p class="muted">Найдено: @students.Count</p>
+}
+
+@code {
+    private List<Student>? students;
+    private List<StudyGroup> groups = new();
+    private string lastName = string.Empty;
+    private string groupFilter = string.Empty;
+    private string statusFilter = string.Empty;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            groups = await Api.GetGroupsAsync();
+        }
+        catch (Exception ex)
+        {
+            error = Labels.Error(ex);
+        }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            Guid? groupId = Guid.TryParse(groupFilter, out var parsedGroup) ? parsedGroup : null;
+            StudentStatus? status = Enum.TryParse<StudentStatus>(statusFilter, out var parsedStatus) ? parsedStatus : null;
+            students = await Api.GetStudentsAsync(lastName, groupId, status);
+        }
+        catch (Exception ex)
+        {
+            error = Labels.Error(ex);
+            students = new List<Student>();
+        }
+    }
+
+    private async Task OnKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await LoadAsync();
+        }
+    }
+}

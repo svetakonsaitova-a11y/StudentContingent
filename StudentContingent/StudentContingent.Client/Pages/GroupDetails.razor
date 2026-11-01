@@ -1,0 +1,86 @@
+@page "/groups/{Id:guid}"
+@inject ContingentApi Api
+
+<PageTitle>@(group?.Number ?? "Группа")</PageTitle>
+
+<a href="groups">← К списку групп</a>
+
+@if (error != null)
+{
+    <div class="alert alert-error" style="margin-top:12px">@error</div>
+}
+else if (group == null || students == null)
+{
+    <p class="muted">Загрузка…</p>
+}
+else
+{
+    <h1 style="margin-top:12px">Группа @group.Number</h1>
+    <p class="subtitle">
+        @group.Course курс · набор @group.EnrollmentYear ·
+        @(group.StudyProgram?.Code) @(group.StudyProgram?.Name)
+    </p>
+
+    @if (students.Count == 0)
+    {
+        <div class="card muted">В группе нет студентов.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>ФИО</th>
+                        <th>№ зачётной книжки</th>
+                        <th>Основа обучения</th>
+                        <th>Основной контакт</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < students.Count; i++)
+                    {
+                        var student = students[i];
+                        <tr>
+                            <td>@(i + 1)</td>
+                            <td><a href="students/@student.Id">@student.FullName</a></td>
+                            <td>@student.RecordBookNumber</td>
+                            <td>@Labels.Of(student.FundingBasis)</td>
+                            <td>@PrimaryContact(student)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="muted">Всего: @students.Count</p>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private StudyGroup? group;
+    private List<Student>? students;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            group = await Api.GetGroupAsync(Id);
+            students = await Api.GetGroupStudentsAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            error = Labels.Error(ex);
+        }
+    }
+
+    private static string PrimaryContact(Student student)
+    {
+        var contact = student.Contacts.FirstOrDefault(c => c.IsPrimary) ?? student.Contacts.FirstOrDefault();
+        return contact?.Value ?? "—";
+    }
+}

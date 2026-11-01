@@ -1,0 +1,149 @@
+@page "/groups"
+@inject ContingentApi Api
+
+<PageTitle>Группы</PageTitle>
+
+<h1>Академические группы</h1>
+<p class="subtitle">Состав группы меняется только событиями движения по приказам.</p>
+
+@if (error != null)
+{
+    <div class="alert alert-error">@error</div>
+}
+
+<div class="grid-2">
+    <div>
+        @if (groups == null)
+        {
+            <p class="muted">Загрузка…</p>
+        }
+        else if (groups.Count == 0)
+        {
+            <div class="card muted">Групп пока нет.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Группа</th>
+                            <th>Программа</th>
+                            <th class="num">Курс</th>
+                            <th class="num">Набор</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var group in groups)
+                        {
+                            <tr>
+                                <td><a href="groups/@group.Id">@group.Number</a></td>
+                                <td>@(group.StudyProgram?.Code) @(group.StudyProgram?.Name)</td>
+                                <td class="num">@group.Course</td>
+                                <td class="num">@group.EnrollmentYear</td>
+                                <td class="num">
+                                    <button class="link-button" @onclick="() => DeleteAsync(group.Id)">удалить</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="card form">
+        <h2>Новая группа</h2>
+        @if (programs.Count == 0)
+        {
+            <p class="muted">Сначала добавьте образовательную программу в <a href="reference">справочниках</a>.</p>
+        }
+        else
+        {
+            <label>Номер группы<input @bind="newGroup.Number" placeholder="ИВТ-21" /></label>
+            <div class="form-row">
+                <label>Курс<input type="number" min="1" max="6" @bind="newGroup.Course" /></label>
+                <label>Год набора<input type="number" @bind="newGroup.EnrollmentYear" /></label>
+            </div>
+            <label>
+                Образовательная программа
+                <select @bind="programId">
+                    <option value="">— выберите —</option>
+                    @foreach (var program in programs)
+                    {
+                        <option value="@program.Id">@program.Code @program.Name (@program.StudyForm)</option>
+                    }
+                </select>
+            </label>
+            <div><button class="primary" @onclick="CreateAsync">Добавить группу</button></div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<StudyGroup>? groups;
+    private List<StudyProgram> programs = new();
+    private StudyGroup newGroup = NewGroup();
+    private string programId = string.Empty;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            groups = await Api.GetGroupsAsync();
+            programs = await Api.GetProgramsAsync();
+        }
+        catch (Exception ex)
+        {
+            error = Labels.Error(ex);
+            groups ??= new List<StudyGroup>();
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        error = null;
+        if (string.IsNullOrWhiteSpace(newGroup.Number) || !Guid.TryParse(programId, out var parsedProgram))
+        {
+            error = "Укажите номер группы и образовательную программу.";
+            return;
+        }
+        newGroup.StudyProgramId = parsedProgram;
+        try
+        {
+            await Api.CreateGroupAsync(newGroup);
+            newGroup = NewGroup();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = Labels.Error(ex);
+        }
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        error = null;
+        try
+        {
+            await Api.DeleteGroupAsync(id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = Labels.Error(ex);
+        }
+    }
+
+    private static StudyGroup NewGroup()
+    {
+        return new StudyGroup { Course = 1, EnrollmentYear = DateTime.Today.Year };
+    }
+}

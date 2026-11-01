@@ -1,0 +1,187 @@
+@page "/reference"
+@inject ContingentApi Api
+
+<PageTitle>Справочники</PageTitle>
+
+<h1>Справочники</h1>
+<p class="subtitle">Подразделения и образовательные программы. Группы — в разделе <a href="groups">«Группы»</a>.</p>
+
+@if (error != null)
+{
+    <div class="alert alert-error">@error</div>
+}
+
+<div class="grid-2">
+    <div class="card">
+        <h2>Подразделения</h2>
+        @if (departments.Count == 0)
+        {
+            <p class="muted">Подразделений пока нет.</p>
+        }
+        else
+        {
+            <table>
+                <tbody>
+                    @foreach (var department in departments)
+                    {
+                        <tr>
+                            <td><strong>@department.ShortName</strong></td>
+                            <td>@department.Name</td>
+                            <td class="muted">@department.Type</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        <div class="form" style="margin-top:16px">
+            <label>Название<input @bind="newDepartment.Name" placeholder="Институт информационных технологий" /></label>
+            <div class="form-row">
+                <label>Сокращение<input @bind="newDepartment.ShortName" placeholder="ИИТ" /></label>
+                <label>Тип<input @bind="newDepartment.Type" placeholder="Институт" /></label>
+            </div>
+            <div><button class="primary" @onclick="CreateDepartmentAsync">Добавить подразделение</button></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Образовательные программы</h2>
+        @if (programs.Count == 0)
+        {
+            <p class="muted">Программ пока нет.</p>
+        }
+        else
+        {
+            <table>
+                <tbody>
+                    @foreach (var program in programs)
+                    {
+                        <tr>
+                            <td><strong>@program.Code</strong></td>
+                            <td>@program.Name<br /><span class="muted">@program.Profile</span></td>
+                            <td class="muted">@program.Level, @program.StudyForm</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        <div class="form" style="margin-top:16px">
+            @if (departments.Count == 0)
+            {
+                <p class="muted">Чтобы добавить программу, сначала добавьте подразделение.</p>
+            }
+            else
+            {
+                <div class="form-row">
+                    <label>Код ОКСО<input @bind="newProgram.Code" placeholder="09.03.01" /></label>
+                    <label>Срок, лет<input type="number" step="0.5" @bind="newProgram.DurationYears" /></label>
+                </div>
+                <label>Направление<input @bind="newProgram.Name" placeholder="Информатика и вычислительная техника" /></label>
+                <label>Профиль<input @bind="newProgram.Profile" /></label>
+                <div class="form-row">
+                    <label>
+                        Уровень
+                        <select @bind="newProgram.Level">
+                            <option value="Бакалавриат">Бакалавриат</option>
+                            <option value="Специалитет">Специалитет</option>
+                            <option value="Магистратура">Магистратура</option>
+                        </select>
+                    </label>
+                    <label>
+                        Форма
+                        <select @bind="newProgram.StudyForm">
+                            <option value="Очная">Очная</option>
+                            <option value="Очно-заочная">Очно-заочная</option>
+                            <option value="Заочная">Заочная</option>
+                        </select>
+                    </label>
+                </div>
+                <label>
+                    Подразделение
+                    <select @bind="departmentId">
+                        <option value="">— выберите —</option>
+                        @foreach (var department in departments)
+                        {
+                            <option value="@department.Id">@department.ShortName — @department.Name</option>
+                        }
+                    </select>
+                </label>
+                <div><button class="primary" @onclick="CreateProgramAsync">Добавить программу</button></div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Department> departments = new();
+    private List<StudyProgram> programs = new();
+    private Department newDepartment = new();
+    private StudyProgram newProgram = NewProgram();
+    private string departmentId = string.Empty;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            departments = await Api.GetDepartmentsAsync();
+            programs = await Api.GetProgramsAsync();
+        }
+        catch (Exception ex)
+        {
+            error = Labels.Error(ex);
+        }
+    }
+
+    private async Task CreateDepartmentAsync()
+    {
+        error = null;
+        if (string.IsNullOrWhiteSpace(newDepartment.Name))
+        {
+            error = "Укажите название подразделения.";
+            return;
+        }
+        try
+        {
+            await Api.CreateDepartmentAsync(newDepartment);
+            newDepartment = new Department();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = Labels.Error(ex);
+        }
+    }
+
+    private async Task CreateProgramAsync()
+    {
+        error = null;
+        if (string.IsNullOrWhiteSpace(newProgram.Code)
+            || string.IsNullOrWhiteSpace(newProgram.Name)
+            || !Guid.TryParse(departmentId, out var parsedDepartment))
+        {
+            error = "Укажите код, название и подразделение.";
+            return;
+        }
+        newProgram.DepartmentId = parsedDepartment;
+        try
+        {
+            await Api.CreateProgramAsync(newProgram);
+            newProgram = NewProgram();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = Labels.Error(ex);
+        }
+    }
+
+    private static StudyProgram NewProgram()
+    {
+        return new StudyProgram { Level = "Бакалавриат", StudyForm = "Очная", DurationYears = 4 };
+    }
+}

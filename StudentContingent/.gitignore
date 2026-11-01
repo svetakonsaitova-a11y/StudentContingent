@@ -1,0 +1,15 @@
+## Visual Studio / .NET
+.vs/
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userprefs
+*.rsuser
+TestResults/
+*.trx
+*.coverage
+*.nupkg
+packages/
+.idea/
+.DS_Store

@@ -1,0 +1,97 @@
+@page "/"
+@inject ContingentApi Api
+
+<PageTitle>Сводка</PageTitle>
+
+<h1>Сводка по контингенту</h1>
+<p class="subtitle">Численность студентов по курсам, статусам и основам обучения.</p>
+
+@if (error != null)
+{
+    <div class="alert alert-error">@error</div>
+}
+else if (rows == null)
+{
+    <p class="muted">Загрузка…</p>
+}
+else
+{
+    <div class="stats">
+        <div class="stat">
+            <div class="stat-value">@(rows.Sum(r => r.Count))</div>
+            <div class="stat-label">всего карточек</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">@CountOf(StudentStatus.Studying)</div>
+            <div class="stat-label">обучаются</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">@CountOf(StudentStatus.AcademicLeave)</div>
+            <div class="stat-label">в академическом отпуске</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">@CountOf(StudentStatus.NotEnrolled)</div>
+            <div class="stat-label">ожидают зачисления</div>
+        </div>
+    </div>
+
+    @if (rows.Count == 0)
+    {
+        <div class="card">
+            Данных пока нет. Порядок заполнения:
+            <a href="reference">подразделение и программа</a> →
+            <a href="groups">группа</a> →
+            <a href="orders">приказ</a> →
+            <a href="students/new">карточка студента</a> →
+            зачисление на странице студента.
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Курс</th>
+                        <th>Статус</th>
+                        <th>Основа обучения</th>
+                        <th class="num">Студентов</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in rows)
+                    {
+                        <tr>
+                            <td>@(row.Course?.ToString() ?? "—")</td>
+                            <td><span class="@Labels.Css(row.Status)">@Labels.Of(row.Status)</span></td>
+                            <td>@Labels.Of(row.FundingBasis)</td>
+                            <td class="num">@row.Count</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    private List<SummaryRow>? rows;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            rows = await Api.GetSummaryAsync();
+        }
+        catch (Exception ex)
+        {
+            error = Labels.Error(ex);
+        }
+    }
+
+    private int CountOf(StudentStatus status)
+    {
+        return rows?.Where(r => r.Status == status).Sum(r => r.Count) ?? 0;
+    }
+}
